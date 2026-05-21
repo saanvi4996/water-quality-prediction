@@ -67,10 +67,12 @@ if st.button("Predict"):
 
     input_encoded = input_encoded[X_encoded.columns]
 
+
     prediction = model.predict(input_encoded)[0]
 
     st.subheader("Predicted Pollutant Levels")
 
     for pollutant, value in zip(pollutants, prediction):
-    st.write(f"{pollutant}: {value:.2f}")
+        st.write(f"{pollutant}: {value:.2f}")
+
 
