@@ -72,5 +72,5 @@ if st.button("Predict"):
     st.subheader("Predicted Pollutant Levels")
 
     for pollutant, value in zip(pollutants, prediction):
-        st.write(f"{pollutant}: {value:.2f}")
-```
+    st.write(f"{pollutant}: {value:.2f}")
+
