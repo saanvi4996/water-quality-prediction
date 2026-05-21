@@ -1,23 +1,47 @@
+```python
 import streamlit as st
 import pandas as pd
-import joblib
+import numpy as np
 
-# Load model and columns
-model = joblib.load("pollution_model.pkl")
-model_columns = joblib.load("model_columns.pkl")
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.ensemble import RandomForestRegressor
 
-# Pollutants
+# Load dataset
+df = pd.read_csv('afa2e701598d20110228 (1).csv', sep=';')
+
+# Preprocessing
+df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y')
+
+df['year'] = df['date'].dt.year
+
 pollutants = ['O2', 'NO3', 'NO2', 'SO4', 'PO4', 'CL']
+
+df = df.dropna(subset=pollutants)
+
+X = df[['id', 'year']]
+y = df[pollutants]
+
+# Encode station IDs
+X_encoded = pd.get_dummies(X, columns=['id'])
+
+# Train model
+model = MultiOutputRegressor(
+    RandomForestRegressor(
+        n_estimators=20,
+        random_state=42
+    )
+)
+
+model.fit(X_encoded, y)
 
 # Streamlit UI
 st.title("Water Quality Prediction System")
 
 st.write("Predict pollutant levels based on station ID and year.")
 
-# Inputs
 station_id = st.selectbox(
     "Select Station ID",
-    [str(i) for i in range(1, 23)]
+    sorted(df['id'].astype(str).unique())
 )
 
 year_input = st.number_input(
@@ -27,31 +51,26 @@ year_input = st.number_input(
     value=2024
 )
 
-# Predict button
-if st.button("Predict Water Quality"):
+if st.button("Predict"):
 
-    # Create input dataframe
     input_data = pd.DataFrame({
-        'year': [year_input],
-        'id': [station_id]
+        'id': [station_id],
+        'year': [year_input]
     })
 
-    # One-hot encoding
     input_encoded = pd.get_dummies(input_data, columns=['id'])
 
-    # Add missing columns
-    missing_cols = set(model_columns) - set(input_encoded.columns)
+    # Match training columns
+    for col in X_encoded.columns:
+        if col not in input_encoded.columns:
+            input_encoded[col] = 0
 
-    for col in missing_cols:
-        input_encoded[col] = 0
+    input_encoded = input_encoded[X_encoded.columns]
 
-    # Arrange columns correctly
-    input_encoded = input_encoded[model_columns]
-
-    # Prediction
     prediction = model.predict(input_encoded)[0]
 
     st.subheader("Predicted Pollutant Levels")
 
     for pollutant, value in zip(pollutants, prediction):
         st.write(f"{pollutant}: {value:.2f}")
+```
