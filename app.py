@@ -1,39 +1,18 @@
-from pathlib import Path
-
 import streamlit as st
 import pandas as pd
 
-from sklearn.multioutput import MultiOutputRegressor
-from sklearn.ensemble import RandomForestRegressor
-
-DATA_PATH = Path(__file__).parent / "data" / "water_quality.csv"
-
-pollutants = ['O2', 'NO3', 'NO2', 'SO4', 'PO4', 'CL']
+from pipeline import POLLUTANTS, encode, load_data, make_model
 
 
 @st.cache_resource
 def train_model():
-    # Load dataset
-    df = pd.read_csv(DATA_PATH, sep=';')
+    df = load_data()
 
-    # Preprocessing
-    df['date'] = pd.to_datetime(df['date'], format='%d.%m.%Y')
-    df['year'] = df['date'].dt.year
-    df = df.dropna(subset=pollutants)
-
-    X = df[['id', 'year']]
-    y = df[pollutants]
-
-    # Encode station IDs
-    X_encoded = pd.get_dummies(X, columns=['id'])
+    X_encoded = encode(df[['id', 'year']])
+    y = df[POLLUTANTS]
 
     # Train model (cached, so this runs once per server start, not on every click)
-    model = MultiOutputRegressor(
-        RandomForestRegressor(
-            n_estimators=20,
-            random_state=42
-        )
-    )
+    model = make_model()
     model.fit(X_encoded, y)
 
     station_ids = sorted(df['id'].unique())
@@ -46,7 +25,10 @@ model, model_columns, station_ids, (min_year, max_year) = train_model()
 # Streamlit UI
 st.title("Water Quality Prediction System")
 
-st.write("Predict pollutant levels based on station ID and year.")
+st.write(
+    f"Predict levels of six water-quality parameters for any of the "
+    f"{len(station_ids)} monitoring stations in a given year."
+)
 st.caption(
     f"Trained on {min_year}–{max_year} measurements. A random forest cannot "
     f"extrapolate, so years after {max_year} return the same values as {max_year}."
@@ -71,14 +53,12 @@ if st.button("Predict"):
         'year': [year_input]
     })
 
-    input_encoded = pd.get_dummies(input_data, columns=['id'])
-
     # Match training columns
-    input_encoded = input_encoded.reindex(columns=model_columns, fill_value=0)
+    input_encoded = encode(input_data, columns=model_columns)
 
     prediction = model.predict(input_encoded)[0]
 
     st.subheader("Predicted Pollutant Levels")
 
-    for pollutant, value in zip(pollutants, prediction):
+    for pollutant, value in zip(POLLUTANTS, prediction):
         st.write(f"{pollutant}: {value:.2f}")
